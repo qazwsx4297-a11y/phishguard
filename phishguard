@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHISHGUARD - Automated URL Detector</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        vtBg: '#0f172a',
+                        vtCard: '#1e293b',
+                        vtBorder: '#334155',
+                        vtAccent: '#3b82f6',
+                        vtAccentHover: '#2563eb'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0d1322; color: #f1f5f9; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-4 md:p-8">
+
+    <!-- Header / Logo Area -->
+    <div class="max-w-4xl mx-auto w-full text-center mt-6">
+        <div class="flex justify-center items-center gap-3 mb-2">
+            <!-- Security Logo Icon -->
+            <div class="w-12 h-12 border-4 border-blue-500 rounded-lg flex items-center justify-center rotate-45 border-t-transparent text-blue-400 font-bold text-xl">
+                <span class="-rotate-45">🛡️</span>
+            </div>
+            <h1 class="text-3xl font-extrabold tracking-wider text-white">PHISHGUARD</h1>
+        </div>
+        <p class="text-sm text-slate-400 max-w-lg mx-auto">
+            Analyse suspicious domains, IPs and URLs to detect phishing and online threats.
+        </p>
+
+        <!-- Navigation Tabs -->
+        <div class="flex justify-center gap-8 mt-8 border-b border-slate-700/60 text-sm font-medium">
+            <button onclick="switchTab('scan')" id="tab-scan" class="pb-3 border-b-2 border-blue-500 text-blue-400 flex items-center gap-2">
+                🌐 URL SCAN
+            </button>
+            <button onclick="switchTab('manage')" id="tab-manage" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2">
+                ⚙️ MANAGE DATABASE (<span id="db-count">0</span>)
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="max-w-3xl mx-auto w-full flex-1 my-6">
+
+        <!-- ================= TAB 1: URL SCANNER ================= -->
+        <div id="section-scan" class="space-y-6">
+            
+            <!-- Globe Icon & Search Box -->
+            <div class="text-center my-6">
+                <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center text-3xl shadow-inner">
+                    🌐
+                </div>
+
+                <div class="relative max-w-xl mx-auto">
+                    <input type="text" id="scan-input" placeholder="Search or scan a URL (e.g., http://104.28.18.2/paypal-login.xyz)" 
+                        class="w-full pl-4 pr-28 py-3.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 shadow-lg">
+                    <button onclick="runScan()" class="absolute right-1.5 top-1.5 bottom-1.5 px-6 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md transition active:scale-95">
+                        Search
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">
+                    By submitting data above, you agree to our Terms of Service & Privacy Notice.
+                </p>
+            </div>
+
+            <!-- SCAN REPORT RESULT CARD (แสดงเมื่อสแกน) -->
+            <div id="report-card" class="hidden bg-slate-800/90 border border-slate-700 rounded-xl p-6 shadow-2xl transition-all">
+                <div class="flex justify-between items-start border-b border-slate-700 pb-4 mb-4">
+                    <div>
+                        <span class="text-xs text-slate-400 font-semibold tracking-wider uppercase">SCAN REPORT</span>
+                        <h2 id="report-url" class="text-base font-bold text-white break-all mt-0.5">-</h2>
+                        <span id="report-time" class="text-[11px] text-slate-400">-</span>
+                    </div>
+                    <div id="risk-badge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                        -
+                    </div>
+                </div>
+
+                <!-- Score Gauge Bar -->
+                <div class="mb-6">
+                    <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span class="text-slate-400">RISK SCORE INDEX</span>
+                        <span id="report-score-text" class="text-white">0 / 100</span>
+                    </div>
+                    <div class="w-full bg-slate-900 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700">
+                        <div id="score-bar" class="h-full rounded-full bg-blue-500 transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Detailed Security Findings -->
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Detected Security Indicators:</h3>
+                    <ul id="findings-list" class="space-y-2 text-xs text-slate-300">
+                        <!-- List Items Inserted via JS -->
+                    </ul>
+                </div>
+
+                <!-- Add to Blacklist Quick Button -->
+                <div id="quick-add-container" class="mt-6 pt-4 border-t border-slate-700/60 flex justify-end">
+                    <button id="btn-quick-add" onclick="addCurrentToDB()" class="text-xs bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 px-4 py-2 rounded-lg transition">
+                        🚨 เพิ่ม URL นี้ลงในฐานข้อมูลเฝ้าระวัง (Blacklist)
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ================= TAB 2: MANAGE DATABASE ================= -->
+        <div id="section-manage" class="hidden space-y-6">
+            
+            <!-- Add New Custom URL Box -->
+            <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-5">
+                <h3 class="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+                    <span>➕</span> เพิ่ม URL ที่น่าสงสัยเข้าสู่ระบบ (Add Suspicious URL)
+                </h3>
+                <div class="flex gap-2">
+                    <input type="text" id="add-url-input" placeholder="กรอก URL เช่น fake-bank-login.net" 
+                        class="flex-1 px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+                    <button onclick="addNewURLManually()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-medium transition">
+                        เพิ่ม URL
+                    </button>
+                </div>
+            </div>
+
+            <!-- Database URL Table List -->
+            <div class="bg-slate-800/80 border border-slate-700 rounded-xl overflow-hidden">
+                <div class="px-5 py-3 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
+                    <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                        รายการ URL ในฐานข้อมูลความเสี่ยง (Custom Blacklist)
+                    </h3>
+                </div>
+
+                <div class="divide-y divide-slate-700/60 text-xs" id="db-table-body">
+                    <!-- Dynamic List Generated via JS -->
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center text-[11px] text-slate-500 py-4 border-t border-slate-800">
+        PhishGuard Security Engine &bull; Automated URL Risk Analysis Tool
+    </footer>
+
+    <!-- JAVASCRIPT ENGINE -->
+    <script>
+        // ฐานข้อมูลตัวอย่างเริ่มต้น
+        let customBlacklist = [
+            "http://104.28.18.2/paypal-login-verify.xyz",
+            "https://free-bonus-claim-updates.com",
+            "http://binance-secure-login-verify.free-account-update.com"
+        ];
+
+        let currentScannedURL = "";
+
+        // สลับแท็บ หน้า Scan / หน้า Manage Database
+        function switchTab(tab) {
+            const scanSec = document.getElementById('section-scan');
+            const manageSec = document.getElementById('section-manage');
+            const tabScan = document.getElementById('tab-scan');
+            const tabManage = document.getElementById('tab-manage');
+
+            if (tab === 'scan') {
+                scanSec.classList.remove('hidden');
+                manageSec.classList.add('hidden');
+                tabScan.className = "pb-3 border-b-2 border-blue-500 text-blue-400 flex items-center gap-2 font-medium";
+                tabManage.className = "pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 font-medium";
+            } else {
+                scanSec.classList.add('hidden');
+                manageSec.classList.remove('hidden');
+                tabManage.className = "pb-3 border-b-2 border-blue-500 text-blue-400 flex items-center gap-2 font-medium";
+                tabScan.className = "pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 font-medium";
+                renderDatabaseTable();
+            }
+        }
+
+        // ระบบวิเคราะห์สแกน URL
+        function runScan() {
+            let rawInput = document.getElementById('scan-input').value.trim();
+            if (!rawInput) return;
+
+            // ทำความสะอาดข้อความ URL
+            let cleanURL = rawInput.replace(/[()\[\]'"]/g, '').trim();
+            currentScannedURL = cleanURL;
+
+            let score = 0;
+            let findings = [];
+
+            // 1. เช็กว่าตรงกับรายการใน Blacklist หรือไม่
+            let inBlacklist = customBlacklist.some(item => cleanURL.toLowerCase().includes(item.toLowerCase()));
+            if (inBlacklist) {
+                score += 50;
+                findings.push('🚨 ตรวจพบในฐานข้อมูลความเสี่ยงอันตราย (Custom Blacklist Database)');
+            }
+
+            // 2. เช็ก HTTPS
+            if (!cleanURL.startsWith('https://')) {
+                score += 20;
+                findings.push('⚠️ ไม่มีการเข้ารหัสความปลอดภัย HTTPS (HTTP Unsecured)');
+            }
+
+            // 3. เช็ก IP Address
+            if (/https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(cleanURL)) {
+                score += 30;
+                findings.push('⚠️ ใช้หมายเลข IP Address ตรงๆ แทนชื่อโดเมนหลัก');
+            }
+
+            // 4. เช็ก Keywords
+            const keywords = ['login', 'verify', 'account', 'update', 'bank', 'secure', 'bonus', 'claim', 'free'];
+            keywords.forEach(kw => {
+                if (cleanURL.toLowerCase().includes(kw)) {
+                    score += 10;
+                    findings.push(`🔍 พบคำคีย์เวิร์ดต้องสงสัย '${kw}' ในลิงก์`);
+                }
+            });
+
+            // 5. เช็ก Brands
+            const brands = ['paypal', 'binance', 'kbank', 'google', 'facebook'];
+            brands.forEach(b => {
+                if (cleanURL.toLowerCase().includes(b) && !cleanURL.includes(`${b}.com`)) {
+                    score += 25;
+                    findings.push(`🚨 มีแนวโน้มแอบอ้างแบรนด์ดัง '${b.toUpperCase()}' นอกโดเมนจริง`);
+                }
+            });
+
+            // 6. เช็ก TLDs
+            if (/\.(xyz|top|tk|free|zip)$/i.test(cleanURL.split('/')[2] || '')) {
+                score += 15;
+                findings.push('⚠️ ใช้นามสกุลโดเมนความเสี่ยงสูง (High-Risk TLD)');
+            }
+
+            score = Math.min(score, 100);
+            renderReport(cleanURL, score, findings, inBlacklist);
+        }
+
+        // แสดงผล Report
+        function renderReport(url, score, findings, inBlacklist) {
+            document.getElementById('report-card').classList.remove('hidden');
+            document.getElementById('report-url').innerText = url;
+            document.getElementById('report-time').innerText = "Scanned at: " + new Date().toLocaleString();
+            document.getElementById('report-score-text').innerText = `${score} / 100`;
+            
+            const scoreBar = document.getElementById('score-bar');
+            scoreBar.style.width = `${score}%`;
+
+            const badge = document.getElementById('risk-badge');
+
+            if (score >= 45) {
+                badge.innerText = "HIGH RISK ⚠️";
+                badge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/40";
+                scoreBar.className = "h-full rounded-full bg-rose-500 transition-all duration-500";
+            } else if (score >= 20) {
+                badge.innerText = "MEDIUM RISK ⚡";
+                badge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/40";
+                scoreBar.className = "h-full rounded-full bg-amber-500 transition-all duration-500";
+            } else {
+                badge.innerText = "LOW RISK ✅";
+                badge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
+                scoreBar.className = "h-full rounded-full bg-emerald-500 transition-all duration-500";
+            }
+
+            const findingsList = document.getElementById('findings-list');
+            if (findings.length === 0) {
+                findingsList.innerHTML = `<li class="text-emerald-400">✓ ไม่พบปัจจัยเสี่ยงในโครงสร้าง URL นี้</li>`;
+            } else {
+                findingsList.innerHTML = findings.map(f => `<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>${f}</li>`).join('');
+            }
+
+            // ปุ่มกด Quick Add
+            const btnQuick = document.getElementById('btn-quick-add');
+            if (inBlacklist) {
+                btnQuick.innerText = "✓ URL นี้อยู่ในฐานข้อมูล Blacklist แล้ว";
+                btnQuick.disabled = true;
+                btnQuick.className = "text-xs bg-slate-700 text-slate-400 px-4 py-2 rounded-lg cursor-not-allowed";
+            } else {
+                btnQuick.innerText = "🚨 เพิ่ม URL นี้ลงในฐานข้อมูลเฝ้าระวัง (Blacklist)";
+                btnQuick.disabled = false;
+                btnQuick.className = "text-xs bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 px-4 py-2 rounded-lg transition";
+            }
+        }
+
+        // เพิ่ม URL จากหน้า Report
+        function addCurrentToDB() {
+            if (currentScannedURL && !customBlacklist.includes(currentScannedURL)) {
+                customBlacklist.push(currentScannedURL);
+                updateDBCount();
+                runScan(); // สแกนใหม่เพื่ออัปเดตสถานะ
+            }
+        }
+
+        // เพิ่ม URL ด้วยตัวเองจากแท็บ Manage
+        function addNewURLManually() {
+            const input = document.getElementById('add-url-input');
+            let url = input.value.trim();
+            if (url && !customBlacklist.includes(url)) {
+                customBlacklist.push(url);
+                input.value = '';
+                renderDatabaseTable();
+                updateDBCount();
+            }
+        }
+
+        // ลบ URL ออกจากฐานข้อมูล
+        function deleteURLFromDB(index) {
+            customBlacklist.splice(index, 1);
+            renderDatabaseTable();
+            updateDBCount();
+        }
+
+        // แสดงตารางรายการ URL ในแท็บ Manage
+        function renderDatabaseTable() {
+            const tableBody = document.getElementById('db-table-body');
+            if (customBlacklist.length === 0) {
+                tableBody.innerHTML = `<div class="p-4 text-center text-slate-500">ไม่มีรายการ URL ในฐานข้อมูล</div>`;
+                return;
+            }
+
+            tableBody.innerHTML = customBlacklist.map((url, index) => `
+                <div class="p-3.5 flex justify-between items-center hover:bg-slate-700/30 transition">
+                    <div class="flex items-center gap-3">
+                        <span class="text-rose-400">⚠️</span>
+                        <span class="font-mono text-slate-200 break-all">${url}</span>
+                    </div>
+                    <button onclick="deleteURLFromDB(${index})" class="text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 px-3 py-1 rounded border border-rose-500/30 transition">
+                        ลบออก (Delete)
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function updateDBCount() {
+            document.getElementById('db-count').innerText = customBlacklist.length;
+        }
+
+        // Initialize Count
+        updateDBCount();
+    </script>
+</body>
+</html>
